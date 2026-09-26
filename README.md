@@ -154,76 +154,6 @@ application resolves at startup, that `requirements.txt` matches `pyproject.toml
 Compose's environment is understood by `Settings`. It complements `docker build`, and does
 not replace it.
 
-## Deploy
-
-### Free, no account, no card: `scripts/free-demo.ps1`
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\free-demo.ps1
-```
-
-Builds the dashboard if needed, starts the API, downloads `cloudflared` on first run, and
-prints a public HTTPS URL. It costs nothing and creates no account. The trade-offs are honest
-ones: the URL **only exists while the script runs**, it **changes every time you start it**,
-and anyone with the link can read and write to the instance. Use it for a live demo; use the
-hosted options below for a permanent address.
-
-### Hosted
-
-The image is the deployment. It builds the dashboard in stage 1 and serves it from FastAPI in
-stage 2, so a running instance is **one origin on one port** with no CORS to configure and no
-second service to keep in sync. Every platform config below just points at the same
-`Dockerfile`.
-
-**The disk is required, not optional.** SQLite, the upload directory and the audit ledger
-all live under `/srv/app/data`. On a platform with an ephemeral filesystem, every redeploy
-silently resets the platform to an empty state, and the provenance story stops being true.
-Attach a persistent volume at that path.
-
-**A volume also decides whether the image starts at all.** Volumes mount *after* the image is
-built, which discards build-time ownership, so the unprivileged application user cannot create
-the database and startup fails with `unable to open database file`. `docker-entrypoint.sh`
-starts as root, repairs ownership, and hands over to `drop_privs.py`, which becomes the
-application user and execs the server so it keeps PID 1 and still receives `SIGTERM`.
-
-| Platform | Config | Notes |
-| --- | --- | --- |
-| **Render** | `render.yaml` | New ▸ Blueprint ▸ point at this repo. The `disk` block is already declared. Cheapest path to a working URL. |
-| **Railway** | `railway.json` | New Project ▸ Deploy from GitHub. Then add a volume mounted at `/srv/app/data`. |
-| **Fly.io** | `fly.toml` | `fly launch --no-deploy`, `fly volumes create odyssey_data --size 1`, `fly deploy`, `fly open`. |
-| **Any Docker host** | `Dockerfile` | `docker build -t odyssey . && docker run -p 8000:8000 -v odyssey-data:/srv/app/data odyssey` |
-
-**On "free" hosting, stated plainly.** This app needs a long-lived process, a writable disk
-and roughly 0.5 GB of RAM, and no free tier provides all three. Render's and Koyeb's free
-tiers have no persistent disk, so the ledger is lost on every restart; Hugging Face moved
-Docker Spaces behind a PRO paywall in July 2026; Railway's Free plan allows a volume but
-credits only about a fifth of what continuous runtime costs; Fly.io requires a card for
-volumes. So on a free tier you are choosing between a link that forgets and a link that
-sleeps. `scripts/free-demo.ps1` sidesteps the trade-off by moving the instance onto hardware
-you already own. If a permanent address matters more than a zero bill, the smallest reliable
-option is a single paid instance, and this image is ready for it.
-
-The image already sets `HOST=0.0.0.0`, `ENVIRONMENT=production`, `ALLOW_PRIVATE_NETWORK_FETCH=false`
-and the SQLite/upload paths, and declares a `HEALTHCHECK` against `/api/health` that the
-platform configs reuse. Nothing else is required to go live — with no `LLM_BASE_URL` set, the
-deterministic extractive engine runs and the instance is fully functional offline.
-
-To use a real model in production, set `LLM_ENABLED=true` plus `LLM_BASE_URL`, `LLM_MODEL` and
-`LLM_API_KEY` (as a secret, not in the config file). The extractive path stays as the fallback.
-
-### Hosting the dashboard on Vercel instead
-
-Optional, and it is a split deployment rather than a simplification: the SPA goes to Vercel's
-CDN and the API still needs a long-lived host from the table above. Vercel's functions are
-stateless and request-scoped with a read-only filesystem, so the backend cannot run there.
-
-1. Deploy the backend first (Render is the quickest), and note its URL.
-2. In Vercel, import this repo. `vercel.json` builds `frontend/` and serves `dist` with an
-   SPA rewrite, so no other setting is needed.
-3. Set `VITE_API_BASE` to the backend's origin, without `/api` — the client appends `/api`
-   itself, and the value is baked in at build time. See `frontend/.env.example`.
-4. Add the Vercel domain to the backend's `CORS_ORIGINS`, or the browser blocks every response.
-
 ## Configuration
 
 Every setting is an environment variable with a working default; the platform runs with no
@@ -426,10 +356,6 @@ dashboard's evidence panel.
 .
 ├── docker-compose.yml         # one-command deployment
 ├── Dockerfile                 # multi-stage: builds the SPA, serves it from FastAPI
-├── render.yaml                # one-click Render blueprint, with the required disk
-├── railway.json               # Railway build and health check
-├── fly.toml                   # Fly.io app, volume and health check
-├── vercel.json                # optional: dashboard-only deploy to Vercel
 ├── backend/
 │   ├── app/
 │   │   ├── main.py            # app factory, CORS, static SPA mount

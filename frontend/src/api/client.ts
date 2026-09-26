@@ -26,12 +26,7 @@ import type {
   TransformationSummary,
 } from './types'
 
-// Same-origin by default: FastAPI serves the built bundle itself. Set
-// VITE_API_BASE to an absolute origin (e.g. https://api.example.com) when the
-// dashboard is hosted separately from the API.
-const CONFIGURED_BASE = (import.meta.env.VITE_API_BASE ?? '').trim().replace(/\/+$/, '')
-
-export const API_BASE = CONFIGURED_BASE || '/api'
+export const API_BASE = '/api'
 
 export class ApiError extends Error {
   readonly status: number
@@ -87,12 +82,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       },
     })
   } catch {
-    throw new ApiError(
-      0,
-      CONFIGURED_BASE
-        ? `Cannot reach the API at ${CONFIGURED_BASE}.`
-        : 'Cannot reach the API. Is the backend running on port 8000?',
-    )
+    throw new ApiError(0, 'Cannot reach the API. Is the backend running on port 8000?')
   }
 
   if (response.status === 204) return undefined as T

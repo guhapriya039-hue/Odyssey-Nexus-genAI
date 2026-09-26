@@ -113,11 +113,7 @@ check("tesseract installed for OCR", "tesseract-ocr" in dockerfile)
 check("poppler installed for pdf2image", "poppler-utils" in dockerfile)
 check("curl installed for healthcheck", "curl" in dockerfile)
 check("every apt package is on one install line", dockerfile.count("apt-get install") == 1)
-check("server does not run as root", "USER root" not in instructions)
-check("unprivileged user is created in the image", "useradd" in dockerfile)
-# --gid 10001 fails the build unless group 10001 exists; --user-group creates
-# it alongside the user, which is what drop_privs.py setgid() needs.
-check("app user's group is created with it, not assumed", "--user-group" in dockerfile)
+check("runs as non-root", "USER odyssey" in instructions)
 check("exposes 8000", "EXPOSE 8000" in instructions)
 check("has a healthcheck", any(i.upper().startswith("HEALTHCHECK") for i in instructions))
 check("healthcheck hits /api/health", "/api/health" in dockerfile)
@@ -139,29 +135,10 @@ check("uvicorn started from the backend root",
       any("uvicorn app.main:app" in i for i in instructions))
 check("PYTHONPATH not required (cwd on sys.path)", "PYTHONPATH" not in dockerfile)
 
+upload = PurePosixPath("/srv/app/backend/storage/uploads")
+check("upload dir under WORKDIR so 'app' still imports", str(upload).startswith("/srv/app/backend"))
 data = PurePosixPath("/srv/app/data/odyssey.db")
 check("sqlite path is absolute in the image", str(data).startswith("/srv/app/data"))
-upload = PurePosixPath("/srv/app/data/uploads")
-check("upload dir keeps 'app' importable (not inside the package)",
-      not str(upload).startswith("/srv/app/backend/app"), str(upload))
-check("uploads share the volume with the database",
-      str(upload).startswith("/srv/app/data"), str(upload))
-
-# A volume is mounted after the image is built, so the build-time chown does not
-# survive. Without an entrypoint that repairs ownership and drops privileges,
-# the unprivileged application user cannot create the database and startup
-# dies with "unable to open database file".
-entry = (ROOT / "backend" / "docker-entrypoint.sh").read_text(encoding="utf-8")
-dropper = (ROOT / "backend" / "drop_privs.py").read_text(encoding="utf-8")
-check("entrypoint script exists in the image", "docker-entrypoint.sh" in dockerfile)
-check("entrypoint is the container entrypoint", "ENTRYPOINT" in dockerfile)
-check("privilege drop is copied into the image", "drop_privs.py" in dockerfile)
-check("entrypoint repairs volume ownership", "chown" in entry)
-check("entrypoint hands over to the privilege drop", "drop_privs.py" in entry)
-check("privilege drop execs the server", "execvp" in dropper)
-check("privilege drop actually changes uid", "setuid" in dropper)
-check("no gosu dependency on an apt package", "gosu" not in dockerfile)
-check("no USER root left at the end", "USER root" not in dockerfile)
 
 
 print("\n[4] compose file")
@@ -240,8 +217,7 @@ check("retrieval top-k from compose", settings.retrieval_top_k == 6)
 check("grounding threshold from compose", settings.grounding_min_score == 0.55)
 check("upload ceiling from compose", settings.max_upload_bytes == 41943040)
 check("retention from compose", settings.retention_days == 90)
-check("upload dir from compose is on the volume",
-      settings.upload_dir.as_posix().endswith("/srv/app/data/uploads"), str(settings.upload_dir))
+check("upload dir from compose", settings.upload_dir.as_posix().endswith("storage/uploads"), str(settings.upload_dir))
 
 
 print("\n" + "=" * 60)

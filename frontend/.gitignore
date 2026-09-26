@@ -12,11 +12,6 @@ dist
 dist-ssr
 *.local
 
-# Local env files; .env.example is the template that belongs in the repo
-.env
-.env.*
-!.env.example
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

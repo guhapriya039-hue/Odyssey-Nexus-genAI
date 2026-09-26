@@ -16,12 +16,9 @@ services:
       - "${ODYSSEY_PORT:-8000}:8000"
     environment:
       ENVIRONMENT: production
-      # Named volume below, so the ledger and the uploaded originals both
-      # survive a rebuild. They share one volume on purpose: a ledger without
-      # the sources it attests to proves nothing.
+      # Named volume below, so the ledger survives a rebuild.
       DATABASE_URL: sqlite:////srv/app/data/odyssey.db
-      UPLOAD_DIR: /srv/app/data/uploads
-      DATA_DIR: /srv/app/data
+      UPLOAD_DIR: /srv/app/backend/storage/uploads
       # Empty LLM settings keep the deterministic extractive path, which needs
       # no network. Uncomment to use the bundled Ollama service below.
       LLM_ENABLED: "false"
