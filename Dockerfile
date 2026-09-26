@@ -42,21 +42,29 @@ RUN pip install -r requirements.txt
 
 COPY backend/app ./app
 COPY backend/scripts ./scripts
+COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY backend/drop_privs.py /usr/local/bin/drop_privs.py
 
 # main.py resolves the dashboard at parents[2]/frontend/dist from app/main.py.
 COPY --from=web /build/dist /srv/app/frontend/dist
 
-# Run unprivileged; the upload directory is the only path it needs to write.
-RUN useradd --create-home --uid 10001 odyssey \
-    && mkdir -p /srv/app/backend/storage/uploads /srv/app/data \
-    && chown -R odyssey:odyssey /srv/app
-USER odyssey
+# Unprivileged application user. The entrypoint starts as root only long enough
+# to make a late-mounted volume writable, then drop_privs.py execs the server as
+# this user, so the server is still PID 1 and still receives SIGTERM directly.
+RUN useradd --create-home --uid 10001 --gid 10001 odyssey \
+    && mkdir -p /srv/app/data /srv/app/data/uploads \
+    && chown -R odyssey:odyssey /srv/app \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# The database and the uploaded originals share one volume, so a redeploy
+# cannot keep the ledger while losing the sources that ledger attests to.
+ENV DATA_DIR=/srv/app/data \
+    UPLOAD_DIR=/srv/app/data/uploads
 
 ENV HOST=0.0.0.0 \
     PORT=8000 \
     ENVIRONMENT=production \
     DATABASE_URL=sqlite:////srv/app/data/odyssey.db \
-    UPLOAD_DIR=/srv/app/backend/storage/uploads \
     ALLOW_PRIVATE_NETWORK_FETCH=false
 
 EXPOSE 8000
@@ -64,4 +72,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT}/api/health" || exit 1
 
-CMD ["sh", "-c", "uvicorn app.main:app --host ${HOST} --port ${PORT}"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host ${HOST} --port ${PORT}"]
