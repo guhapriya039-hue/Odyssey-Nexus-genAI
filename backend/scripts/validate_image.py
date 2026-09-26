@@ -115,6 +115,9 @@ check("curl installed for healthcheck", "curl" in dockerfile)
 check("every apt package is on one install line", dockerfile.count("apt-get install") == 1)
 check("server does not run as root", "USER root" not in instructions)
 check("unprivileged user is created in the image", "useradd" in dockerfile)
+# --gid 10001 fails the build unless group 10001 exists; --user-group creates
+# it alongside the user, which is what drop_privs.py setgid() needs.
+check("app user's group is created with it, not assumed", "--user-group" in dockerfile)
 check("exposes 8000", "EXPOSE 8000" in instructions)
 check("has a healthcheck", any(i.upper().startswith("HEALTHCHECK") for i in instructions))
 check("healthcheck hits /api/health", "/api/health" in dockerfile)

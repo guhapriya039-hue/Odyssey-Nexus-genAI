@@ -51,7 +51,7 @@ COPY --from=web /build/dist /srv/app/frontend/dist
 # Unprivileged application user. The entrypoint starts as root only long enough
 # to make a late-mounted volume writable, then drop_privs.py execs the server as
 # this user, so the server is still PID 1 and still receives SIGTERM directly.
-RUN useradd --create-home --uid 10001 --gid 10001 odyssey \
+RUN useradd --create-home --uid 10001 --user-group odyssey \
     && mkdir -p /srv/app/data /srv/app/data/uploads \
     && chown -R odyssey:odyssey /srv/app \
     && chmod +x /usr/local/bin/docker-entrypoint.sh
