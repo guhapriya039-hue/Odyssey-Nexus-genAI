@@ -21,6 +21,10 @@ dist/
 *.sqlite3
 backend/storage/
 
+# Downloaded by scripts/free-demo.ps1; a 55 MB binary has no place in git
+scripts/cloudflared.exe
+scripts/cloudflared
+
 # Secrets: .env.example is the template that belongs in the repo
 .env
 .env.*

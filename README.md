@@ -156,6 +156,20 @@ not replace it.
 
 ## Deploy
 
+### Free, no account, no card: `scripts/free-demo.ps1`
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\free-demo.ps1
+```
+
+Builds the dashboard if needed, starts the API, downloads `cloudflared` on first run, and
+prints a public HTTPS URL. It costs nothing and creates no account. The trade-offs are honest
+ones: the URL **only exists while the script runs**, it **changes every time you start it**,
+and anyone with the link can read and write to the instance. Use it for a live demo; use the
+hosted options below for a permanent address.
+
+### Hosted
+
 The image is the deployment. It builds the dashboard in stage 1 and serves it from FastAPI in
 stage 2, so a running instance is **one origin on one port** with no CORS to configure and no
 second service to keep in sync. Every platform config below just points at the same
@@ -166,12 +180,28 @@ all live under `/srv/app/data`. On a platform with an ephemeral filesystem, ever
 silently resets the platform to an empty state, and the provenance story stops being true.
 Attach a persistent volume at that path.
 
+**A volume also decides whether the image starts at all.** Volumes mount *after* the image is
+built, which discards build-time ownership, so the unprivileged application user cannot create
+the database and startup fails with `unable to open database file`. `docker-entrypoint.sh`
+starts as root, repairs ownership, and hands over to `drop_privs.py`, which becomes the
+application user and execs the server so it keeps PID 1 and still receives `SIGTERM`.
+
 | Platform | Config | Notes |
 | --- | --- | --- |
 | **Render** | `render.yaml` | New ▸ Blueprint ▸ point at this repo. The `disk` block is already declared. Cheapest path to a working URL. |
 | **Railway** | `railway.json` | New Project ▸ Deploy from GitHub. Then add a volume mounted at `/srv/app/data`. |
 | **Fly.io** | `fly.toml` | `fly launch --no-deploy`, `fly volumes create odyssey_data --size 1`, `fly deploy`, `fly open`. |
 | **Any Docker host** | `Dockerfile` | `docker build -t odyssey . && docker run -p 8000:8000 -v odyssey-data:/srv/app/data odyssey` |
+
+**On "free" hosting, stated plainly.** This app needs a long-lived process, a writable disk
+and roughly 0.5 GB of RAM, and no free tier provides all three. Render's and Koyeb's free
+tiers have no persistent disk, so the ledger is lost on every restart; Hugging Face moved
+Docker Spaces behind a PRO paywall in July 2026; Railway's Free plan allows a volume but
+credits only about a fifth of what continuous runtime costs; Fly.io requires a card for
+volumes. So on a free tier you are choosing between a link that forgets and a link that
+sleeps. `scripts/free-demo.ps1` sidesteps the trade-off by moving the instance onto hardware
+you already own. If a permanent address matters more than a zero bill, the smallest reliable
+option is a single paid instance, and this image is ready for it.
 
 The image already sets `HOST=0.0.0.0`, `ENVIRONMENT=production`, `ALLOW_PRIVATE_NETWORK_FETCH=false`
 and the SQLite/upload paths, and declares a `HEALTHCHECK` against `/api/health` that the
