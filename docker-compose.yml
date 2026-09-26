@@ -1,0 +1,63 @@
+# ODYSSEY TRANSFORM CORE - one command, one origin.
+#
+#   docker compose up --build              # dashboard + API on http://localhost:8000
+#   docker compose --profile llm up --build  # ...with a local Ollama model
+#
+# The API serves the built dashboard, so port 8000 is the only port to open.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: odyssey-transform-core:1.4.0
+    container_name: odyssey-transform-core
+    ports:
+      - "${ODYSSEY_PORT:-8000}:8000"
+    environment:
+      ENVIRONMENT: production
+      # Named volume below, so the ledger survives a rebuild.
+      DATABASE_URL: sqlite:////srv/app/data/odyssey.db
+      UPLOAD_DIR: /srv/app/backend/storage/uploads
+      # Empty LLM settings keep the deterministic extractive path, which needs
+      # no network. Uncomment to use the bundled Ollama service below.
+      LLM_ENABLED: "false"
+      # LLM_BASE_URL: http://ollama:11434/v1
+      # LLM_MODEL: llama3.1
+      LLM_TEMPERATURE: "0.2"
+      LLM_MAX_OUTPUT_TOKENS: "1400"
+      EMBEDDING_PROVIDER: auto
+      RETRIEVAL_TOP_K: "6"
+      GROUNDING_MIN_SCORE: "0.55"
+      NUMERIC_GROUNDING: "true"
+      PII_REDACTION: "true"
+      # Keep false anywhere shared: this is the SSRF guard for URL ingestion.
+      ALLOW_PRIVATE_NETWORK_FETCH: "false"
+      ALLOW_WEB_INGESTION: "true"
+      MAX_UPLOAD_BYTES: "41943040"
+      RETENTION_DAYS: "90"
+    volumes:
+      - odyssey-data:/srv/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Optional local model server. Enable with:  docker compose --profile llm up
+  # then set LLM_ENABLED=true and LLM_BASE_URL=http://ollama:11434/v1 above.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: odyssey-ollama
+    profiles: ["llm"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  odyssey-data:
+  ollama-models:

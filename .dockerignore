@@ -1,0 +1,36 @@
+# Keep the build context small and free of local state.
+
+.git
+.gitignore
+**/.env
+**/.venv
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+
+# Local databases and uploads
+backend/odyssey.db
+backend/odyssey.db-shm
+backend/odyssey.db-wal
+backend/storage
+backend/smoke.db*
+
+# Build output: stage 1 produces it inside the image.
+frontend/dist
+frontend/node_modules
+frontend/.vite
+
+# Editor and OS noise
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.swp
+
+# Docs and compose files are not needed to build the image.
+README.md
+docs
+docker-compose.yml
