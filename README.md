@@ -98,6 +98,21 @@ docker exec -it odyssey-ollama ollama pull llama3.1
 Then set `LLM_ENABLED=true` and `LLM_BASE_URL=http://ollama:11434/v1` in
 `docker-compose.yml` and restart.
 
+### Render (free tier)
+
+`render.yaml` is a blueprint: one free web service that builds the same Dockerfile, so the
+public URL serves the dashboard and the API from one origin.
+
+1. Push the repository, then open <https://dashboard.render.com/blueprint/new>.
+2. Connect `guhapriya039-hue/Odyssey-Nexus-genAI` and apply the blueprint as-is.
+
+The Free plan has 512 MB of RAM, 0.1 CPU, no persistent disk and a 15-minute idle
+spin-down, so the blueprint does three things the Compose file does not: it puts the SQLite
+ledger under `/tmp` (ephemeral — lost on every deploy, restart and spin-down), lowers
+`MAX_UPLOAD_BYTES` to 10 MB, and leaves `LLM_ENABLED=false` so no model is downloaded into
+512 MB. Everything else — the guardrails, the audit chain, the human review gate — runs
+unchanged. Treat it as a demo URL, not as a system of record.
+
 ### Local development
 
 Requires Python 3.11+ and Node 20.19+ (22.12+ recommended — Vite 8's floor).
